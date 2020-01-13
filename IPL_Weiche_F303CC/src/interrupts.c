@@ -9,14 +9,14 @@
  */
 
 /* Includes ------------------------------------------------------------------*/
-#include <interrupts.h>
+#include "interrupts.h"
 #include "stm32f3xx.h"
 
 
 /* Globale Variablen */
 extern volatile uint8_t package[3];
 extern volatile _Bool received;
-extern volatile int set;
+extern volatile TypeDefTurnoutState state;
 
 /* Modul-Variablen */
 _Bool stepdirection=0, stepenable=0;
@@ -152,22 +152,22 @@ void TIM2_IRQHandler(void){
 }
 
 void ADC1_2_IRQHandler(void){
-	if (POTI<10)
+	if (POTI<20)
 	{
-		ADC2->TR1 =0xFFFF0000;
-		LEDoffl;
-		LEDonr;
-		set=3;
+		state=left;
+		setLED(state);
 	}
-	else if (POTI>3000)
+	else if (POTI>300)
 	{
-		ADC2->TR1 =0xFFFF0000;
-		LEDoffr;
-		LEDonl;
-		set=3;
+		state=right;
+		setLED(state);
+	}else{
+		state=undefined;
+		setLED(state);
 	}
 	H_BRIDGE_OFF;
 	setstepenable(0);
+
 
 	/* ISR finished */
 	NVIC_ClearPendingIRQ(ADC1_2_IRQn); //Interruptflag cleared
@@ -181,28 +181,30 @@ void EXTI0_IRQHandler(void){
 }
 
 void EXTI1_IRQHandler(void){			//button links
-	LEDoffr;
-	blinkonl;
-	H_BRIDGE_ON;
-	setstepdirection(0);
-	setstepenable(1);
-	ADC2->TR1 = (0xFFFF<<16) | 0x000A;
-	set=1;
+	if(state!=left){
+		state=movingleft;
+		setLED(state);
+		setstepdirection(0);
+		setstepenable(1);
+		H_BRIDGE_ON;
+		ADC2->TR1 = (0xFFFF<<16) | 0x000A;
 
+	}
 	/* ISR finished */
 	NVIC_ClearPendingIRQ(EXTI1_IRQn);
 	EXTI->PR |= EXTI_PR_PR1;
 }
 
 void EXTI2_TSC_IRQHandler(void){			//button rechts
-	LEDoffl;
-	blinkonr;
-	H_BRIDGE_ON;
-	setstepdirection(1);
-	setstepenable(1);
-	ADC2->TR1 = (0xBB8<<16) | 0x0000;
-	set=2;
+	if (state!=right){
+		state=movingright;
+		setLED(state);
+		setstepdirection(1);
+		setstepenable(1);
+		H_BRIDGE_ON;
+		ADC2->TR1 = (0xBB8<<16) | 0x0000;
 
+	}
 	/* ISR finished */
 	NVIC_ClearPendingIRQ(EXTI2_TSC_IRQn);
 	EXTI->PR |= EXTI_PR_PR2;

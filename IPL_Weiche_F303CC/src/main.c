@@ -21,7 +21,7 @@ volatile uint8_t package[3];
 volatile _Bool received;
 
 //Weiche Variablen
-volatile int set=1;
+volatile TypeDefTurnoutState state;
 
 
 int main(void){
@@ -43,27 +43,13 @@ int main(void){
 	RESET_Function();				// Weichensteuerung initialisieren
 	dcc_address = 162;				// Adresse auslesen
 	__enable_irq();					// Interrupts einschalten
-
 	//Schleife
 	while(1){
 		/* Position auslesen */
 		checkpos();		//Refactor
 		/* DCC Decode */
 		if(received){
-			rPackage.turnout_address=(package[1] & 0x6)>>1;		// Weichenadresse auslesen
-			rPackage.direction=(package[1] & 0x1);				// Richtung auslesen
-			/*	byte 1		byte 2
-				10AAAAAA  	1AAA1BBR
-
-				A=address
-				B=turnout
-				R=direction
-			*/
-			rPackage.dcc_address = ((package[0] & 0x3F)<<3) | ((package[1] & 0x70)>>4);	//DCC-Adresse auslesen
-			//Pariät prüfen
-			if((package[0]^package[1])==package[2]){
-				parity = 1;
-			}
+			decodeDCC(&rPackage, &parity);
 			/* DCC Adresse prüfen */
 			if(rPackage.dcc_address==dcc_address && parity){
 				switch(rPackage.turnout_address){
@@ -121,7 +107,7 @@ int main(void){
 					break;
 				}
 
-				while(set!=3){									// warten bis die Weiche vollständig gestellt wurde
+				while(state==movingleft || state==movingright){									// warten bis die Weiche vollständig gestellt wurde
 					checkpos();
 				}
 				received=0;										// received flag zurücksetzten
@@ -141,14 +127,14 @@ int main(void){
 }
 
 void checkpos(void){
-	if ((set==1) || (set==2)){
+	if (state==movingleft || state==movingright){
 		int fader_old=POTI;
 		int fader_sub50, fader_add50;
 		if(fader_old>50)
-			fader_sub50 = fader_old-15;
+			fader_sub50 = fader_old-50;
 		else
 			fader_sub50 =0;
-		fader_add50 = fader_old+15;
+		fader_add50 = fader_old+50;
 		delay(DELTA_MEAS_TIME);											// warte 1s
 		if ((POTI>=fader_sub50) && (POTI<=fader_add50))
 		{
@@ -156,7 +142,7 @@ void checkpos(void){
 			H_BRIDGE_OFF;
 			blinkonl;
 			blinkonr;
-			set=3;
+			state=undefined;
 		}
 	}
 
@@ -185,4 +171,48 @@ uint8_t get_address(void){
 void RESET_Function(void){
 	H_BRIDGE_OFF;
 	setstepenable(0);
+}
+
+void setLED(TypeDefTurnoutState status){
+	switch(status){
+	case movingleft:
+		blinkonl;
+		LEDoffr;
+		break;
+	case movingright:
+		blinkonr;
+		LEDoffl;
+		break;
+	case left:
+		LEDonl;
+		LEDoffr;
+		break;
+	case right:
+		LEDonr;
+		LEDoffl;
+		break;
+	case undefined:
+		blinkonl;
+		blinkonr;
+		break;
+	default:
+		break;
+	}
+}
+
+void decodeDCC(volatile TypeDefPackage* rPackage, volatile uint8_t * parity){
+	rPackage->turnout_address=(package[1] & 0x6)>>1;		// Weichenadresse auslesen
+	rPackage->direction=(package[1] & 0x1);				// Richtung auslesen
+	/*	byte 1		byte 2
+		10AAAAAA  	1AAA1BBR
+
+		A=address
+		B=turnout
+		R=direction
+	*/
+	rPackage->dcc_address = ((package[0] & 0x3F)<<3) | ((package[1] & 0x70)>>4);	//DCC-Adresse auslesen
+	//Pariät prüfen
+	if((package[0]^package[1])==package[2]){
+		*parity = 1;
+	}
 }

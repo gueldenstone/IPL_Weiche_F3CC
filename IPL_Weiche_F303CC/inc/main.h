@@ -13,6 +13,7 @@ typedef struct{
 	uint8_t turnout_address;
 	TypeDefPosition direction;
 }TypeDefPackage;
+typedef enum{movingleft, movingright, left, right, undefined} TypeDefTurnoutState;
 
 /* Defines -------------------------------------------------------------------*/
 //DCC-Decode
@@ -30,16 +31,16 @@ typedef struct{
 
 /* LEDs */
 #define LED_ARR		(200)
-#define blinkonr	TIM4->CCR1=LED_ARR/2
-#define blinkonl	TIM4->CCR2=LED_ARR/2
-#define LEDonr		TIM4->CCR1=1000
-#define LEDonl		TIM4->CCR2=1000
-#define LEDoffr		TIM4->CCR1=0000
-#define LEDoffl		TIM4->CCR2=0000
+#define blinkonr	TIM4->CCR2=LED_ARR/2
+#define blinkonl	TIM4->CCR1=LED_ARR/2
+#define LEDonr		TIM4->CCR2=1000
+#define LEDonl		TIM4->CCR1=1000
+#define LEDoffr		TIM4->CCR2=0000
+#define LEDoffl		TIM4->CCR1=0000
 
 /* Buttons & Poti */
 #define POTI ADC2->DR //4095 links;0 rechts
-#define DELTA_MEAS_TIME 250		// Zeit (in ms) zwischen zwei Messungen (bis Stillstand erkannt wird)
+#define DELTA_MEAS_TIME 200		// Zeit (in ms) zwischen zwei Messungen (bis Stillstand erkannt wird)
 
 /* Prototypes -----------------------------------------------------------------*/
 void Error_Handler(void);
@@ -47,5 +48,7 @@ uint8_t get_address(void);
 void checkpos(void);
 void delay(uint32_t ms);
 void RESET_Function(void);
+void setLED(TypeDefTurnoutState status);
+void decodeDCC(volatile TypeDefPackage* rPackage, volatile uint8_t * parity);
 
 #endif /* __MAIN_H */
